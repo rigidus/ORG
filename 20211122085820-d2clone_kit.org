@@ -1,0 +1,13 @@
+:PROPERTIES:
+:ID:       4ae20818-6f49-4809-9aaa-2a434364d19c
+:END:
+#+title: d2clone-kit
+
+offsite: https://awkravchuk.itch.io/darkness-looming-the-dawn
+docs: https://lockie.gitlab.io/d2clone-kit/
+src: https://gitlab.com/lockie/d2clone-kit
+
+lisp meetup: https://www.youtube.com/watch?v=8IMkW7DDcjM
+
+Thing:
+- [[id:0f387c73-ec41-4d83-98ce-cd677644889f][OnDemandTutorial]]
