@@ -1,0 +1,61 @@
+:PROPERTIES:
+:ID:       ca8f76ae-e8ee-4b23-9912-db216d04a548
+:END:
+#+title: Lisp
+
+* Projects
+
+  - [[id:4ae20818-6f49-4809-9aaa-2a434364d19c][d2clone-kit]]
+
+* Lisp
+
+  - Interlisp
+    - [[id:4e6afb5a-ee34-4fb6-b001-e1ba002dbfc6][Medley]]
+
+  - [[https://justinethier.github.io/cyclone/docs/Garbage-Collector][Cyclone Scheme]] (Garbage Collector)
+
+  - History of Lisp:
+    - [[https://www.youtube.com/watch?v=hGY3uBHVVr4][Let's Lisp like it's 1950]]
+    - [[https://www.dreamsongs.com/Files/HOPL2-Uncut.pdf][The Evolution of Lisp]]
+    - [[http://jmc.stanford.edu/articles/lisp/lisp.pdf][History of Lisp]]
+    - [[https://dspace.mit.edu/bitstream/handle/1721.1/5679/AIM-646.pdf][The Connection Machine]]
+    - [[https://www.youtube.com/watch?v=2Op3QLzMgSY&list=PL8FE88AA54363BC46][SICP Lections playlist]] ([[https://www.youtube.com/watch?v=FIUJd_ZFmGo&list=PL7BcsI5ueSNFPCEisbaoQ0kXIDX9rR5FF][Second]])
+
+  - Ideas:
+    - [[id:47a31827-a468-4cfa-ad21-c887b3c72e87][ConnectionMachine]]
+      - [[https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.108.5413&rep=rep1&type=pdf][Connection Machine Lisp - Fine-Grained Parallel Symbolic Processing]] , [[file:~/src/books/prg/'Connection Machine Lisp - Fine-Grained Parallel Symbolic Processing.pdf'][local]]
+    - [[id:238f43f3-0373-482e-9775-cc6cc043fb5d][ContentAddressableMemory]]
+    - [[https://www.reddit.com/r/lisp/comments/7sp8mo/is_there_any_nonlisp_that_copies_common_lisps/][Is there any non-lisp that copies Common Lisp's condition system?]]
+    - [[https://www.reddit.com/r/lisp/comments/450izr/how_could_one_load_a_lisp_as_the_kernel_of_an/][How could one load a lisp as the kernel of an operating system?]]
+    - [[http://www.softwarepreservation.org/projects/LISP/interlisp-d/3100186-Interlisp_Oct83.pdf/view][Interlisp - Chapter 15 DWIM (Do-What-I-Mean)]]
+    - [[https://www.youtube.com/watch?v=1zS46_HWRMo][CLOS presentation]]
+    - [[https://www.youtube.com/watch?v=2qsmF8HHskg][editing experience on InterLisp-D]]
+    - [[https://www.youtube.com/watch?v=7RNbIEJvjUA][demos of InterLisp-D and Symbolics Genera]]
+    - [[https://www.ics.uci.edu/~taylor/ics228/Interlisp.pdf][overview of InterLisp]]
+    - [[https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.384.8830&rep=rep1&type=pdf][collection of papers on InterLisp-D]]
+    - [[https://www.youtube.com/watch?v=x6-b_hazcyk][Larry Masinter, The Medley Interlisp Project: Status and Plans - YouTube]]
+    - [[http://public.bht-berlin.de/hamann/][HAMANN-MAIN / HomePage]]
+    - [[http://public.bht-berlin.de/hamann/lisp/index.html][LISP]] (deutch) blockworld (!)
+    - [[https://www.c64-wiki.de/wiki/LISP_64][LISP 64 – C64-Wiki]]
+    - [[https://3lib.net/book/3372772/29bd75][Understanding Natural Language | Terry Winograd | download]] , [[file://~/src/books/prg/Understanding Natural Language by Terry Winograd (z-lib.org)][local]] and https://dspace.mit.edu/handle/1721.1/7095
+    - [[https://www.youtube.com/watch?v=QAJz4YKUwqw][winograd shrdlu - YouTube]] - demo
+    - [[https://www.youtube.com/watch?v=hfb7e5Bhzqw][Common Lisp Study Group: cl-environments (Part 2) - YouTube]]
+
+  - Repos
+    - Kilo Lisp
+      - [[https://github.com/ytaki0801/kilo-lisp][Kilo embedding LISP interpreter]] , [[https://www.lulu.com/en/us/shop/nils-m-holm/the-kilo-lisp-system/hardcover/product-1wk5vvw6.html?page=1&pageSize=4][book]]
+      - [[http://t3x.org/klisp/index.html][A Kilo Byte-Sized LISP System]] , [[https://news.ycombinator.com/item?id=19415735][YC]]
+    - [[https://github.com/ryanwoodsmall/crosware/commit/fc472e9124286df0b5d5629a6fe2a0793ef8313c][crossware-commit]]
+      - t3x.org stuff (nils holm)
+      - klisp (http://t3x.org/klisp)
+      - s9fes (https://www.t3x.org/s9fes https://github.com/bakul/s9fes and https://github.com/barak/scheme9)
+      - subc (https://www.t3x.org/subc) (https://github.com/kstephens/subc)
+    - [[http://t3x.org/lfn/index.html][LISP FROM NOTHING]] (https://www.reddit.com/user/nils-m-holm)
+    - [[http://mirror.informatimago.com/scheme/www.t3x.org/nmh/books.html][Books by Nels Holm]] , https://www.goodreads.com/author/show/17166620.Nils_M_Holm
+    - [[https://justine.lol/sectorlisp/][SectorLisp]] LISP tiny enough to fit in the boot record of a floppy disk (from https://twitter.com/justinetunney)
+    - http://www.nhplace.com/kent/Papers/cl-untold-story.html
+    - https://github.com/wmannis/cl-svg
+    - [[https://www.youtube.com/watch?v=7RNbIEJvjUA][#rC3 - What have we lost? - YouTube]]
+    - [[https://www.youtube.com/watch?v=hfb7e5Bhzqw][Common Lisp Study Group: cl-environments - YouTube]]
+    - [[https://scholar.google.com/citations?user=Ur3sFscAAAAJ][Guy L. Steele Jr.‬ - ‪Академия Google]]
+    - [[http://www.softwarepreservation.org/projects/LISP/starlisp/sim/][sim — Software Preservation Group]]
