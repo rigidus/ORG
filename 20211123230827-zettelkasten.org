@@ -1,0 +1,6 @@
+:PROPERTIES:
+:ID:       436203a2-1bbf-46b7-b790-b289ffcae3c5
+:END:
+#+title: Zettelkasten
+
+- https://habr.com/ru/post/508672/
