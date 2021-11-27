@@ -1,0 +1,35 @@
+:PROPERTIES:
+:ID:       3cc85a38-2ddd-41e5-99e9-fdf64704ff28
+:END:
+#+title: Forth
+
+- Forth
+  - [[https://github.com/flagxor/eforth/tree/main/circleforth]] Created as
+    an example of a minimalist Forth in the style of typical "toy"
+    Lisp implementations.
+  - [[https://news.ycombinator.com/item?id=15709671][how HN: Forsh – A Unix shell embedded in Forth (bitbucket.org/cowile)]]
+  - [[https://github.com/vastopol/uexp][experiments with non C style language]]
+  - [[https://www.youtube.com/watch?v=gPk-e9vGSWU][Code Your Own Forth - Intro and Initial Setup]]
+  - https://mirrors.pdp-11.ru/search.php?text=Forth+pdf&page=1
+  - [[https://github.com/orgs/ForthHub/repositories][ForthHub]]
+  - [[https://github.com/ForthHub/discussion/issues/77][Venery (Collections for Forth) · Issue #77 · ForthHub/discussion]]
+  - [[https://www.bountysource.com/teams/forthhub/issues?tracker_ids=12836444][ForthHub - Bountysource]]
+  - [[https://github.com/ForthHub/discussion/issues/75][On Forth lexeme translator · Issue #75 · ForthHub/discussion]]
+- Unsorted
+  - https://www.youtube.com/watch?v=ivVRhJyScjE (https://github.com/guitarvydas/Divide-and-Conquer)
+  - https://ai.jpl.nasa.gov/public/documents/papers/chien_iwpss2013_scheduling.pdf
+  - https://www.aaai.org/Papers/Symposia/Spring/1992/SS-92-01/SS92-01-001.pdf
+  - https://dl.acm.org/newsletter/sigplan-lisppointers
+    - https://dl.acm.org/doi/10.1145/224133.224135
+    - https://dl.acm.org/doi/10.1145/224133.224134
+    - https://dl.acm.org/doi/10.1145/224133.224137
+    - https://dl.acm.org/doi/10.1145/224133.224136
+  - http://www.greenarraychips.com/home/documents/greg/SFW32PR-190525.pdf
+- Discission
+  - POSTPONE
+    - https://github.com/ForthHub/discussion/discussions/103
+    - https://github.com/ForthHub/discussion/discussions/103
+- [[http://www.ultratechnology.com/chips.htm][Forth Chips]]
+- [[http://the-epic-file.com/text/bookz/sc/sc_contents.htm][Stack Computers (ru)]]
+- https://opensourcelibs.com/libs/forth
+- https://awesomeopensource.com/projects/forth

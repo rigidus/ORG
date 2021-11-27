@@ -20,7 +20,7 @@
 
 Также существует проект https://github.com/minio/c2goasm который позволяет преобразовать ассемблерные .s файлы в Go-ассемблерные. Он показывает, как сишные функции с интрисинками могут быть преобразованы в Go-ассемблер.
 
-* DONE How to get go assembly code my Go-program
+* DONE How to get go assembly code of my Go-program
 
 Let's start with GoLang helloworld:
 
@@ -54,9 +54,11 @@ Build it:
 
 Now we have main.asm with go assembly
 
-* How to compile and call C-function from Go
+* START How to compile and call C-function from Go
 
-Если сделать import "C", то комментарий, который идет перед ним
+** Simple variant
+
+Если сделать import "C", то комментарий, который идет перед ним будет скомпилирован как си-код и включен в сборку.
 
 #+BEGIN_SRC go
   package main
@@ -80,6 +82,370 @@ build:
   # CGO_ENABLED=1 GOOS=linux go build -buildmode=plugin -o path/to/module.so test.go
 #+END_SRC
 
+** Extended variant
+
+Таким образом можно сделать ~#include~ чтобы прилинковать сишную библиотеку и вызывать её функции. Туда же можно поместить флаги для компиляции.
+
+#+BEGIN_SRC go :tangle ./cgo-examples/main.go :noweb yes
+  package main
+
+  /*
+     #cgo CFLAGS: -I${SRCDIR}/ctestlib
+     #cgo LDFLAGS: -Wl,-rpath,${SRCDIR}/ctestlib
+     #cgo LDFLAGS: -L${SRCDIR}/ctestlib
+     #cgo LDFLAGS: -ltest
+
+     #include <test.h>
+  ,*/
+  import "C"
+  import (
+      "bytes"
+      "fmt"
+      "unsafe"
+  )
+
+  <<go_decl>>
+
+  func main() {
+      <<go_call>>
+  }
+#+END_SRC
+
+Example of Makefile
+
+#+BEGIN_SRC sh
+  .PHONY: all c go run env
+
+  TESTLIBPATH="./ctestlib"
+
+  all: c go run
+
+  env:
+      docker build --tag cgo .
+      docker run --rm -ti -v $(shell pwd):/src cgo
+
+  c:
+      gcc -c -Wall -Werror -fpic -o ${TESTLIBPATH}/test.o ${TESTLIBPATH}/test.c
+      gcc -shared -o ${TESTLIBPATH}/libtest.so ${TESTLIBPATH}/test.o
+
+  go:
+      go build -o app *.go
+
+  run:
+      ./app
+#+END_SRC
+
+Сишный код, который станет библиотекой
+
+#+BEGIN_SRC c :tangle ./cgo-examples/ctestlib/test.c :noweb yes
+  #include "test.h"
+
+  <<c_code>>
+#+END_SRC
+
+и h-файл к нему
+
+#+BEGIN_SRC c :tangle ./cgo-examples/ctestlib/test.h :noweb yes
+  #ifndef _TESTLIB_H_
+  #define _TESTLIB_H_
+
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  <<h_code>>
+
+  #endif
+#+END_SRC
+
+*** Sum
+
+Сначала пусть просто функция, которая демонстрирует выполнение вычислений в си-коде:
+
+#+BEGIN_SRC c :noweb-ref h_code
+  int sum(int a, int b);
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  int sum(int a, int b) {
+      return a + b;
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("\nNumbers")
+  a := 1
+  b := 2
+  sum := int(C.sum(C.int(a), C.int(b)))
+  fmt.Print(sum, "\n\n")
+#+END_SRC
+
+*** Get string
+
+Теперь получим константную строку из си-кода
+
+#+BEGIN_SRC c :noweb-ref h_code
+  const char* get_string();
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  const char* get_string() {
+      return "string sent from C";
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Get string")
+  getString := C.GoString(C.get_string())
+  fmt.Println(getString)
+  stringBytes := C.GoBytes(unsafe.Pointer(C.get_string()), 24)
+  fmt.Println(stringBytes[0:bytes.Index(stringBytes, []byte{0})])
+  fmt.Println()
+#+END_SRC
+
+*** Send string to C
+
+Печать переданной из Go строки в сишном коде
+
+#+BEGIN_SRC c :noweb-ref h_code
+  void print_string(char* a);
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  void print_string(char* a) {
+      printf("string sent from Go: %s\n", a);
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Send string")
+  str := "lorem ipsum"
+  cStr := C.CString(str)
+  C.print_string(cStr)
+  C.free(unsafe.Pointer(cStr))
+  fmt.Println()
+#+END_SRC
+
+*** Send buffer to C
+
+Печать строки, которая была передана из Go-кода
+
+#+BEGIN_SRC c :noweb-ref h_code
+  void print_buffer(unsigned char *buf, size_t size);
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  void print_buffer(unsigned char *buf, size_t size) {
+      for (uint i = 0; i < size; i++) {
+          printf("%X", buf[i]);
+      }
+      printf("\n");
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Send byte array")
+  data := []byte{1, 4, 2}
+  cBytes := (*C.uchar)(unsafe.Pointer(&data[0]))
+  cBytesLength := C.size_t(len(data))
+  fmt.Print("bytes: ")
+  C.print_buffer(cBytes, cBytesLength)
+  fmt.Println()
+#+END_SRC
+
+*** Struct
+
+Работа со структурами, объявленными в си-коде
+
+#+BEGIN_SRC c :noweb-ref h_code
+  typedef struct point
+  {
+      int x;
+      int y;
+  } point;
+
+  int point_diff(point p);
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  int point_diff(point p) {
+      return p.x - p.y;
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Get and pass struct")
+  point := C.struct_point{}
+  point.x = 0
+  point.y = 2
+  fmt.Println(point)
+  fmt.Print(C.point_diff(point), "\n\n")
+#+END_SRC
+
+*** Arbitrary data: unsafe.Pointer to void pointer
+
+Передача void-указателя
+
+#+BEGIN_SRC c :noweb-ref h_code
+  void pass_void_pointer(void *ptr);
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  void pass_void_pointer(void *ptr) {
+      printf("%d\n", *((int*)ptr));
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Pass void pointer")
+  C.pass_void_pointer(unsafe.Pointer(&point.y))
+  fmt.Println()
+#+END_SRC
+
+*** Enum
+
+#+BEGIN_SRC c :noweb-ref h_code
+  enum status {
+      PENDING,
+      DONE,
+  };
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_decl
+  const (
+      Pending Status = iota
+      Done
+  )
+#+END_SRC
+
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Access enum")
+  fmt.Print(C.enum_status(Pending) == C.PENDING, C.PENDING, C.DONE, "\n\n")
+#+END_SRC
+
+*** Callback
+
+#+BEGIN_SRC c :noweb-ref h_code
+  void generate_numbers(uint num, uint callback);
+  void user_action(uint callback);
+#+END_SRC
+
+#+BEGIN_SRC c :noweb-ref c_code
+  void generate_numbers(uint num, uint callback) {
+      void evenNumberCallbackProxy(uint, int);
+
+      for (uint i = 0; i <= num; i++) {
+          if (i % 2 == 0) {
+              evenNumberCallbackProxy(callback, i);
+          }
+      }
+  }
+
+  void user_action(uint callback) {
+      void userCallbackProxy(uint);
+
+      for (int i = 0; i < 5; i++) {
+          userCallbackProxy(callback);
+      }
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :tangle proxy.go
+  package main
+
+  import "C"
+  import (
+      "sync"
+      "unsafe"
+  )
+
+  type (
+      index    uint8
+      store    map[index]interface{}
+      callback struct {
+          callback interface{}
+          arg      unsafe.Pointer
+      }
+  )
+
+  var (
+      storage = make(store)
+      mutex   sync.Mutex
+  )
+
+  //export evenNumberCallbackProxy
+  func evenNumberCallbackProxy(i C.uint, num int) {
+      c := getCallback(index(i))
+      c.callback.(func(int))(num)
+  }
+
+  //export userCallbackProxy
+  func userCallbackProxy(i C.uint) {
+      c := getCallback(index(i))
+      c.callback.(func(unsafe.Pointer))(c.arg)
+  }
+
+  func registerCallback(c interface{}, arg unsafe.Pointer) C.uint {
+      mutex.Lock()
+      i := index(len(storage))
+      storage[i] = &callback{
+          callback: c,
+          arg:      arg,
+      }
+      mutex.Unlock()
+
+      return C.uint(i)
+  }
+
+  func getCallback(i index) *callback {
+      mutex.Lock()
+      defer mutex.Unlock()
+      return storage[i].(*callback)
+  }
+
+  func unregisterCallback(i C.uint) {
+      mutex.Lock()
+      delete(storage, index(i))
+      mutex.Unlock()
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_decl
+  type User struct {
+      Username string
+      Visits   int
+  }
+
+  type Status int
+
+  func evenNumberCallback(num int) {
+      fmt.Println("odd number: ", num)
+  }
+
+  func userCallback(user unsafe.Pointer) {
+      u := (*User)(unsafe.Pointer(user))
+      u.Visits++
+  }
+#+END_SRC
+
+#+BEGIN_SRC go :noweb-ref go_call
+  // Callback
+  fmt.Println("Pass callback")
+  c := registerCallback(evenNumberCallback, nil)
+  C.generate_numbers(5, c)
+  unregisterCallback(c)
+
+  // Callback with params
+  user := User{
+      Username: "johndoe",
+  }
+  cWithParams := registerCallback(userCallback, unsafe.Pointer(&user))
+  C.user_action(cWithParams)
+  unregisterCallback(cWithParams)
+  fmt.Println(user)
+#+END_SRC
+
+*** TODO Intrisincs
 * TODO How I can see assembly code for only one my functions
 * TODO How I can wrote assebly functions and call it from GO?
 * TODO How I can call GO-function and use GO-data from my assembly code?
@@ -134,3 +500,4 @@ reader, ассемблер может ссылаться на поле ~r~ ка�
 
   https://pkg.go.dev/cmd/cgo
   https://go.dev/doc/asm
+  https://github.com/andreiavrammsd/cgo-examples
