@@ -311,6 +311,8 @@ Example of Makefile
 #+END_SRC
 
 #+BEGIN_SRC go :noweb-ref go_decl
+  type Status int
+
   const (
       Pending Status = iota
       Done
@@ -325,10 +327,34 @@ Example of Makefile
 
 *** Callback
 
-#+BEGIN_SRC c :noweb-ref h_code
-  void generate_numbers(uint num, uint callback);
-  void user_action(uint callback);
+Мы хотим вызвать гошный коллбэк ~evenNumberCallback~ из сишного
+кода. Для этого мы будем использовать следующую последовательность
+действий:
+- регистрируем коллбэк в гошной функции ~registerCallback~, она
+  возвращает нам индекс коллбэка
+- вызываем сишную функцию ~generate_numbers~, передавая ей индекс
+  коллбека. Она:
+  - вызывает гошную функцию ~evenNumberCallbackProxy~ (несколько раз)
+    передавая ей номер коллбэка. Она:
+    - получает коллбэк по его номеру, вызывая гошную функцию
+      ~getCallback~, которая возвращает указатель на коллбэк.
+    - вызывает коллбэк по этому указателю и возвращается
+  - возвращается
+- удаляем зарегитированный коллбэк
+
+#+BEGIN_SRC go :noweb-ref go_call
+  fmt.Println("Pass callback")
+  c := registerCallback(evenNumberCallback, nil)
+  C.generate_numbers(5, c)
+  unregisterCallback(c)
 #+END_SRC
+
+Начнем с сишной функции ~generate_numbers~, оставив более простую
+регистрацию и удаление коллбэка на потом. В ней надо объявить
+~evenNumberCallbackProxy~, которая по-видимому станет внешним
+(external) символом, что (по моим догадкам) позволит линкеру
+слинковать этот символ с гошной функцией, и таким образом сделать ее
+доступной для вызова.
 
 #+BEGIN_SRC c :noweb-ref c_code
   void generate_numbers(uint num, uint callback) {
@@ -340,25 +366,53 @@ Example of Makefile
           }
       }
   }
+#+END_SRC
 
-  void user_action(uint callback) {
-      void userCallbackProxy(uint);
+Также не забыть объявить ~generate_numbers~ в заголовочном файле:
 
-      for (int i = 0; i < 5; i++) {
-          userCallbackProxy(callback);
-      }
+#+BEGIN_SRC c :noweb-ref h_code
+  void generate_numbers(uint num, uint callback);
+#+END_SRC
+
+Теперь нужно написать го-функцию ~evenNumberCallbackProxy~,
+объявив ее символ экспортируемым:
+
+#+NAME: even_number_callback_proxy
+#+BEGIN_SRC go
+  //export evenNumberCallbackProxy
+  func evenNumberCallbackProxy(i C.uint, num int) {
+      c := getCallback(index(i))
+      c.callback.(func(int))(num)
   }
 #+END_SRC
 
-#+BEGIN_SRC go :tangle proxy.go
-  package main
+Эта функция использует неэкспортируемую функцию ~getCallback~, которая
+для потокобезопасности должна использовать мьютекс:
 
-  import "C"
-  import (
-      "sync"
-      "unsafe"
+#+NAME: get_сallback
+#+BEGIN_SRC go
+  func getCallback(i index) *callback {
+      mutex.Lock()
+      defer mutex.Unlock()
+      return storage[i].(*callback)
+  }
+#+END_SRC
+
+Так как ей требуется ~storage~ и ~mutex~ мы должны объявить их:
+
+#+NAME: var_storage_mutex
+#+BEGIN_SRC go
+  var (
+      storage = make(store)
+      mutex   sync.Mutex
   )
+#+END_SRC
 
+Используемый тип ~store~ - это просто хэшмапа, в которой ключи - это
+индексы (=uint8), значения - интерфейсы. Заодно тут же определим коллбэк, как структуру, в которой есть указатель на аргумент
+
+#+NAME: type_index_store_callback
+#+BEGIN_SRC go
   type (
       index    uint8
       store    map[index]interface{}
@@ -367,24 +421,13 @@ Example of Makefile
           arg      unsafe.Pointer
       }
   )
+#+END_SRC
 
-  var (
-      storage = make(store)
-      mutex   sync.Mutex
-  )
+Теперь можно вернуться к регистрации и удалению коллбэка. Эти функции
+тоже для потокобезопасности используют мьютексы:
 
-  //export evenNumberCallbackProxy
-  func evenNumberCallbackProxy(i C.uint, num int) {
-      c := getCallback(index(i))
-      c.callback.(func(int))(num)
-  }
-
-  //export userCallbackProxy
-  func userCallbackProxy(i C.uint) {
-      c := getCallback(index(i))
-      c.callback.(func(unsafe.Pointer))(c.arg)
-  }
-
+#+NAME: register_unregister_callback
+#+BEGIN_SRC go
   func registerCallback(c interface{}, arg unsafe.Pointer) C.uint {
       mutex.Lock()
       i := index(len(storage))
@@ -397,12 +440,6 @@ Example of Makefile
       return C.uint(i)
   }
 
-  func getCallback(i index) *callback {
-      mutex.Lock()
-      defer mutex.Unlock()
-      return storage[i].(*callback)
-  }
-
   func unregisterCallback(i C.uint) {
       mutex.Lock()
       delete(storage, index(i))
@@ -410,13 +447,89 @@ Example of Makefile
   }
 #+END_SRC
 
+Осталось собрать все гошные функции в файл proxy.go
+
+#+BEGIN_SRC go :tangle ./cgo-examples/proxy.go :mkdirp yes :noweb yes
+  package main
+
+  import "C"
+  import (
+      "sync"
+      "unsafe"
+  )
+
+  <<type_index_store_callback>>
+
+  <<var_storage_mutex>>
+
+  <<even_number_callback_proxy>>
+
+  //export userCallbackProxy
+  func userCallbackProxy(i C.uint) {
+      c := getCallback(index(i))
+      c.callback.(func(unsafe.Pointer))(c.arg)
+  }
+
+  <<register_unregister_callback>>
+
+  <<get_сallback>>
+
+#+END_SRC
+
+*** Callback with params
+
+Шаги:
+- начальная иницализация гошной структуры ~user~
+- регистрируем коллбэк, при регистрации передаем указатель на
+  ~user~. Этот указатель сохраняется в коллбеке. Возвращаемое
+  значение - индекс коллбэка - запоминаем.
+- вызываем сишную функцию ~user_action~, передавая ей индекс
+  коллбэка. Она:
+  - вызывает гошную функцию ~userCallbackProxy~ (несколько раз) передавая ей номер коллбэка. Она:
+    - получает коллбэк по его номеру
+    - вызывая коллбек с аргументом, который взят из структуры ~user~, которая получена из структуры коллбэка.
+    - возвращается
+  - возвращается
+- удаляем коллбэк
+- печатаем ~user~
+
+#+NAME: todo
+#+BEGIN_SRC go :noweb-ref go_call
+  user := User{
+      Username: "johndoe",
+  }
+  cWithParams := registerCallback(userCallback, unsafe.Pointer(&user))
+  C.user_action(cWithParams)
+  unregisterCallback(cWithParams)
+  fmt.Println(user)
+#+END_SRC
+
+Начнем с сишной функции ~user_action~.
+
+#+BEGIN_SRC c :noweb-ref c_code
+  void user_action(uint callback) {
+      void userCallbackProxy(uint);
+
+      for (int i = 0; i < 5; i++) {
+          userCallbackProxy(callback);
+      }
+  }
+#+END_SRC
+
+Также не забыть объявить ~user_action~ в заголовочном файле:
+
+#+BEGIN_SRC c :noweb-ref h_code
+  void user_action(uint callback);
+#+END_SRC
+
+~userCallbackProxy~ уже написан в предыдущем разделе и объявлен
+экспортируемым.
+
 #+BEGIN_SRC go :noweb-ref go_decl
   type User struct {
       Username string
       Visits   int
   }
-
-  type Status int
 
   func evenNumberCallback(num int) {
       fmt.Println("odd number: ", num)
@@ -426,23 +539,6 @@ Example of Makefile
       u := (*User)(unsafe.Pointer(user))
       u.Visits++
   }
-#+END_SRC
-
-#+BEGIN_SRC go :noweb-ref go_call
-  // Callback
-  fmt.Println("Pass callback")
-  c := registerCallback(evenNumberCallback, nil)
-  C.generate_numbers(5, c)
-  unregisterCallback(c)
-
-  // Callback with params
-  user := User{
-      Username: "johndoe",
-  }
-  cWithParams := registerCallback(userCallback, unsafe.Pointer(&user))
-  C.user_action(cWithParams)
-  unregisterCallback(cWithParams)
-  fmt.Println(user)
 #+END_SRC
 
 *** TODO Intrisincs
