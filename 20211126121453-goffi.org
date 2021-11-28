@@ -541,7 +541,65 @@ Example of Makefile
   }
 #+END_SRC
 
-*** TODO Intrisincs
+*** Intrinsics
+
+[[https://www.codeproject.com/Articles/874396/Crunching-Numbers-with-AVX-and-AVX][Crunching Numbers with AVX and AVX2]]
+
+#+BEGIN_SRC c :tangle tmp/hello_avx.c
+  /* compile: gcc -mavx -o hello_avx hello_avx.c */
+  #include <immintrin.h>
+  #include <stdio.h>
+
+  int main() {
+
+      /* Initialize the two argument vectors */
+      __m256 evens = _mm256_set_ps(2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0);
+      __m256 odds = _mm256_set_ps(1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0);
+
+      /* Compute the difference between the two vectors */
+      __m256 result = _mm256_sub_ps(evens, odds);
+
+      /* Display the elements of the result vector */
+      float* f = (float*)&result;
+      printf("%f %f %f %f %f %f %f %f\n",
+             f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]);
+
+      return 0;
+  }
+#+END_SRC
+
+[[https://www.felixcloutier.com/x86/index.html][x86 and amd64 instruction reference]]
+[[https://chryswoods.com/vector_c++/emmintrin.html][chryswoods.com | Part 2: SSE Intrinsics]]
+[[https://assets.ctfassets.net/9pcn2syx7zns/1bexmTsBaXHArazquMviK4/5c1524d460e1173d160fcba93157c3a6/compiler-intrinsics-and-assembly.pdf][Intrinsics]]
+[[https://link.springer.com/content/pdf/bbm%3A978-1-4302-0219-6%2F1.pdf][Using GCC Compilers]]
+[[https://gcc.gnu.org/onlinedocs/gcc/Vector-Extensions.html][Vector Extensions (Using the GNU Compiler Collection (GCC))]]
+[[https://gcc.gnu.org/onlinedocs/gcc/C-Extensions.html#C-Extensions][C Extensions (Using the GNU Compiler Collection (GCC))]]
+[[https://dmalcolm.fedorapeople.org/gcc/2015-08-31/rst-experiment/how-to-use-inline-assembly-language-in-c-code.html][How to Use Inline Assembly Language in C Code — gcc 6 documentation]]
+[[https://www.it.uc3m.es/pbasanta/asng/course_notes/ctut.pdf][The GNU C Programming Tutorial]]
+https://www.cnblogs.com/zyl910/archive/2012/08/27/intrin\_table\_gcc.html
+https://www.youtube.com/watch?v=x9Scb5Mku1g
+[[https://www.linuxjournal.com/content/introduction-gcc-compiler-intrinsics-vector-processing][An Introduction to GCC Compiler Intrinsics in Vector Processing | Linux Journal]]
+
+Other stuff:
+
+[[https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html][Programming Guide :: CUDA Toolkit Documentation]]
+[[https://stackoverflow.blog/2020/07/08/improving-performance-with-simd-intrinsics-in-three-use-cases/][Improving performance with SIMD intrinsics in three use cases - Stack Overflow Blog]]
+[[https://www.codingame.com/playgrounds/283/sse-avx-vectorization/sse-and-avx-usage][SSE and AVX Usage - SSE & AVX Vectorization]]
+[[https://acl.inf.ethz.ch/teaching/fastcode/2020/slides/07-simd-avx.pdf][SIMD extensions, AVX, compiler vectorization]]
+
+
+*** TODO Assembly
+
+[[https://www.physicsforums.com/insights/an-intro-to-avx-512-assembly-programming/][An Intro to AVX-512 Assembly Programming]]
+[[https://www.cs.uaf.edu/courses/cs441/notes/sse-avx/][SSE & AVX: x86 SIMD]]
+[[https://wiki.osdev.org/Inline_Assembly/Examples][Inline Assembly/Examples - OSDev Wiki]]
+[[https://gcc.gnu.org/onlinedocs/gcc/Using-Assembly-Language-with-C.html#Using-Assembly-Language-with-C][Using Assembly Language with C (Using the GNU Compiler Collection (GCC))]]
+[[https://docs.oracle.com/cd/E36784_01/html/E36859/gntbd.html][AVX Instructions - x86 Assembly Language Reference Manual]]
+[[https://docs.oracle.com/cd/E37838_01/html/E61064/gsesq.html][AVX512 Instructions - x86 Assembly Language Reference Manual]]
+[[http://www.cs.uu.nl/docs/vakken/magr/2017-2018/files/SIMD%20Tutorial.pdf][Practical SIMD Programming]]
+
+[[https://www.agner.org/optimize/optimizing_assembly.pdf][Optimizing subroutines in assembly language. An optimization guide for x86 platforms]]
+
 * TODO How I can see assembly code for only one my functions
 * TODO How I can wrote assebly functions and call it from GO?
 * TODO How I can call GO-function and use GO-data from my assembly code?
