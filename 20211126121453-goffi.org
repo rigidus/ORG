@@ -125,7 +125,7 @@ Example of Makefile
       docker run --rm -ti -v $(shell pwd):/src cgo
 
   c:
-      gcc -c -Wall -Werror -fpic -o ${TESTLIBPATH}/test.o ${TESTLIBPATH}/test.c
+      gcc -c -Wall -Werror -fpic -o ${TESTLIBPATH}/test.o \ ${TESTLIBPATH}/test.c
       gcc -shared -o ${TESTLIBPATH}/libtest.so ${TESTLIBPATH}/test.o
 
   go:
@@ -607,11 +607,19 @@ Other stuff:
 #+BEGIN_SRC go :tangle ./proto/main.go :noweb yes
   package main
 
-  //int pt(){
-  // return 1;
-  //}
+  /*
+       #cgo CFLAGS: -I${SRCDIR}/ctestlib
+       #cgo LDFLAGS: -Wl,-rpath,${SRCDIR}/ctestlib
+       #cgo LDFLAGS: -L${SRCDIR}/ctestlib
+       #cgo LDFLAGS: -ltest
+
+       #include <test.h>
+  ,*/
   import "C"
-  import "fmt"
+  import (
+      "fmt"
+      "unsafe"
+  )
 
   //go:linkname overflowError runtime.overflowError
   var overflowError error
@@ -1080,7 +1088,6 @@ Other stuff:
   }
 
   func main() {
-      fmt.Println(C.pt())
       var x *uint256b = NewUint256b().SetUint64(100)
       var y *uint256b = NewUint256b().SetUint64(200)
       var amount *uint256b = NewUint256b().SetUint64(400)
@@ -1088,6 +1095,32 @@ Other stuff:
       var mulv2 *uint256b = NewUint256b().SetUint64(600)
       fmt.Println(CalcAmountOut(x, y, amount, mulv1, mulv2))
       // fmt.Println(fmt.CalculateGas(fromToken, toToken, amount))
+      fmt.Println("Send byte array")
+      data := []byte{1, 4, 2}
+      cBytes := (*C.uchar)(unsafe.Pointer(&data[0]))
+      cBytesLength := C.size_t(len(data))
+      fmt.Print("bytes: ")
+      C.print_buffer(cBytes, cBytesLength)
+      fmt.Println()
+  }
+#+END_SRC
+
+#+BEGIN_SRC c :tangle ./proto/ctestlib/test.h :noweb yes
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  void print_buffer(unsigned char *buf, size_t size);
+#+END_SRC
+
+
+#+BEGIN_SRC go :tangle ./proto/ctestlib/test.c :noweb yes
+  #include "test.h"
+
+  void print_buffer(unsigned char *buf, size_t size) {
+      for (uint i = 0; i < size; i++) {
+          printf("%X", buf[i]);
+      }
+      printf("\n");
   }
 #+END_SRC
 
