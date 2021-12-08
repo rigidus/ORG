@@ -602,7 +602,41 @@ Other stuff:
 
 [[https://www.agner.org/optimize/optimizing_assembly.pdf][Optimizing subroutines in assembly language. An optimization guide for x86 platforms]]
 
-*** TODO Proto
+*** TODO Proto GoLang only
+
+Смотрим ассемблер который генерирует Go для умножения 64-разрядных целых:
+
+#+BEGIN_SRC go :tangle ./proto/asm.go :noweb yes
+  // go tool compile -S asm.go > asm.asm
+  package main
+
+  import (
+      "fmt"
+        "math/bits"
+  )
+
+  func myInput(msg string, p1 *uint64) {
+      fmt.Print(msg)
+      fmt.Scan(p1)
+      fmt.Println()
+  }
+
+  func myMul(x, y uint64) (uint64, uint64) {
+      var hi, lo uint64
+      hi, lo = bits.Mul64(x, y)
+      return hi, lo
+  }
+
+  func main() {
+      var x, y, hi, lo uint64
+      myInput("Enter X: ", &x)
+      myInput("Enter Y: ", &y)
+      hi, lo = myMul(x, y)
+      fmt.Println(hi, lo)
+  }
+#+END_SRC
+
+*** COMMENT Proto
 
 Добавляем -mavx в Makefile
 Добавляем <immintrin.h> в h-файл
@@ -1181,7 +1215,6 @@ Other stuff:
       //     f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]);
   }
 #+END_SRC
-
 * TODO How I can see assembly code for only one my functions
 * TODO How I can wrote assebly functions and call it from GO?
 * START How I can call GO-function and use GO-data from my assembly code?
