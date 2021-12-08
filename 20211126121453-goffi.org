@@ -1122,9 +1122,11 @@ Other stuff:
   #define FMAFlag     ((1UL<<12)|AVXFlag|OSXSAVEFlag)
   #define CLMULFlag   ((1UL<< 1)|AVXFlag|OSXSAVEFlag)
 
-  typedef __m256i _256;
+  #define set_zero(var) for (uint i = 0; i < 31; i++) { var[i] = 0; }
+  typedef unsigned char byte;
+  typedef byte i256[32] __attribute__ ((aligned (512)));
 
-  _256 AmountOut(_256 x, _256 y, _256 amount, _256 mulv1, _256 mulv2);
+  // void mul256(i256 *x, i256 *y, i256 *r);
 
   void print_buffer(unsigned char *buf, size_t size);
 #+END_SRC
@@ -1133,28 +1135,50 @@ Other stuff:
 #+BEGIN_SRC go :tangle ./proto/ctestlib/test.c :noweb yes
   #include "test.h"
 
-  _256 AmountOut(_256 x, _256 y, _256 amount, _256 mulv1, _256 mulv2) {
-	_...mm256_loadu_si256
+  void mul256 (i256* px, i256* py, i256* rv) {
+      __m256i vx = _mm256_loadu_si256( (__m256i_u*)px );
+      __m256i vy = _mm256_loadu_si256( (__m256i_u*)py );
+	    // rv = _mm256_mul_ps(vx, vy);
+      _mm256_store_si256( (__m256i *)rv, vy );
+      _mm256_store_si256( (__m256i *)rv, vx );
   }
 
   void print_buffer(unsigned char *buf, size_t size) {
-      for (uint i = 0; i < size; i++) {
-          printf("%X", buf[i]);
+      i256 x;
+      set_zero(x);
+      x[0] = 2;
+
+      i256 y;
+      set_zero(y);
+      x[0] = 3;
+
+      i256 r;
+      set_zero(r);
+
+      mul256(&x, &y, &r);
+
+      for (uint i = 0; i < 31; i++) {
+          printf("%X.", r[i]);
       }
       printf("\n");
 
-      _mm256_zeroall();
-      /* Initialize the two argument vectors */
-      __m256 evens = _mm256_set_ps(2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0);
-      __m256 odds = _mm256_set_ps(1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0);
+      // for (uint i = 0; i < size; i++) {
+      //     printf("%X", buf[i]);
+      // }
+      // printf("\n");
 
-      /* Compute the difference between the two vectors */
-      __m256 result = _mm256_sub_ps(evens, odds);
+      // _mm256_zeroall();
+      // /* Initialize the two argument vectors */
+      // __m256 evens = _mm256_set_ps(2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0);
+      // __m256 odds = _mm256_set_ps(1.0, 3.0, 5.0, 7.0, 9.0, 11.0, 13.0, 15.0);
 
-      /* Display the elements of the result vector */
-      float* f = (float*)&result;
-      printf("%f %f %f %f %f %f %f %f\n",
-          f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]);
+      // /* Compute the difference between the two vectors */
+      // __m256 result = _mm256_sub_ps(evens, odds);
+
+      // /* Display the elements of the result vector */
+      // float* f = (float*)&result;
+      // printf("%f %f %f %f %f %f %f %f\n",
+      //     f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7]);
   }
 #+END_SRC
 
