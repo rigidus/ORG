@@ -602,17 +602,19 @@ Other stuff:
 
 [[https://www.agner.org/optimize/optimizing_assembly.pdf][Optimizing subroutines in assembly language. An optimization guide for x86 platforms]]
 
-*** TODO Proto GoLang only
+[[https://cryptologie.net/article/406/simd-instructions-in-go/][SIMD instructions in Go]]
+
+*** Asm for Mul64
 
 Смотрим ассемблер который генерирует Go для умножения 64-разрядных целых:
 
-#+BEGIN_SRC go :tangle ./proto/asm.go :noweb yes
+#+BEGIN_SRC go :tangle ./proto/asmtest/asm.go :noweb yes :mkdir yes
   // go tool compile -S asm.go > asm.asm
   package main
 
   import (
       "fmt"
-        "math/bits"
+      // "math/bits"
   )
 
   func myInput(msg string, p1 *uint64) {
@@ -621,9 +623,30 @@ Other stuff:
       fmt.Println()
   }
 
+  // Mul64 returns the 128-bit product of x and y: (hi, lo) = x * y
+  // with the product bits' upper half returned in hi and the lower
+  // half returned in lo.
+  //
+  // This function's execution time does not depend on the inputs.
+  func Mul64(x, y uint64) (hi, lo uint64) {
+      const mask32 = 1<<32 - 1
+      x0 := x & mask32
+      x1 := x >> 32
+      y0 := y & mask32
+      y1 := y >> 32
+      w0 := x0 * y0
+      t := x1*y0 + w0>>32
+      w1 := t & mask32
+      w2 := t >> 32
+      w1 += x0 * y1
+      hi = x1*y1 + w2 + w1>>32
+      lo = x * y
+      return
+  }
+
   func myMul(x, y uint64) (uint64, uint64) {
       var hi, lo uint64
-      hi, lo = bits.Mul64(x, y)
+      hi, lo = Mul64(x, y)
       return hi, lo
   }
 
@@ -636,7 +659,7 @@ Other stuff:
   }
 #+END_SRC
 
-*** COMMENT Proto
+*** START Proto
 
 Добавляем -mavx в Makefile
 Добавляем <immintrin.h> в h-файл
@@ -1117,9 +1140,9 @@ Other stuff:
        ,*/
       var mulA, mulX uint256b
       mulA.Mul(a, mulv1)
-      mulX.Mul(x, mulv2)
-      mulX.Add(&mulX, &mulA)	// vpaddb // vpmaxsw
-      mulA.Mul(y, &mulA)      // vpmulld
+      mulX.Mul(x, mulv2)      // vpmuldq // vpmuludq // vpmulld
+      mulX.Add(&mulX, &mulA)	// vpaddq // vpmaxsw
+      mulA.Mul(y, &mulA)      // vpmullq
       mulA.Div(&mulA, &mulX)
       return &mulA
   }
@@ -1165,34 +1188,123 @@ Other stuff:
   void print_buffer(unsigned char *buf, size_t size);
 #+END_SRC
 
+compile: gcc -c -Wall -Werror -mavx512f -fpic -o ${TESTLIBPATH}/test.o ${TESTLIBPATH}/test.c
 
 #+BEGIN_SRC go :tangle ./proto/ctestlib/test.c :noweb yes
+  // gcc -mavx -C -g -Wa,-a,-ad -S -o test.asm test.c
   #include "test.h"
 
-  void mul256 (i256* px, i256* py, i256* rv) {
-      __m256i vx = _mm256_loadu_si256( (__m256i_u*)px );
-      __m256i vy = _mm256_loadu_si256( (__m256i_u*)py );
-	    // rv = _mm256_mul_ps(vx, vy);
-      _mm256_store_si256( (__m256i *)rv, vy );
-      _mm256_store_si256( (__m256i *)rv, vx );
+  #include <stdlib.h>
+  #include <string.h>
+  #include <math.h>
+
+  int the_mask = 0; // global so the compiler can't be sure what its value is for opt.
+
+  static double frand()
+  {
+      return (double)rand() / (double)RAND_MAX;
+  }
+
+  static void randmat(double *A)
+  {
+      for (int i=0; i < 4; i++)
+          for (int j=0; j < 4; j++)
+              A[4*i+j] = frand();
+  }
+
+  static void randvec(double *x)
+  {
+      for (int i=0; i < 4; i++)
+          x[i] = frand();
+  }
+
+  void vecmatvec_avx(const double* restrict x, const double* restrict A,
+                     const double* restrict y, double* restrict out)
+  {
+      asm volatile ("# avx code begin");  // looking at assembly with gcc -S
+      __m256d yrow = _mm256_loadu_pd(y);
+      __m256d xrow = _mm256_loadu_pd(x);
+
+      __m256d a = _mm256_mul_pd(_mm256_loadu_pd(A), yrow);
+      __m256d b = _mm256_mul_pd(_mm256_loadu_pd(A+4), yrow);
+      __m256d c = _mm256_mul_pd(_mm256_loadu_pd(A+8), yrow);
+      __m256d d = _mm256_mul_pd(_mm256_loadu_pd(A+12), yrow);
+
+      // our task now is to get {sum(a), sum(b), sum(c), sum(d)}
+      // This is tricky because there is no hadd instruction for avx
+
+      // {a[0]+a[1], b[0]+b[1], a[2]+a[3], b[2]+b[3]}
+      __m256d sumab = _mm256_hadd_pd(a, b);
+
+      // {c[0]+c[1], d[0]+d[1], c[2]+c[3], d[2]+d[3]}
+      __m256d sumcd = _mm256_hadd_pd(c, d);
+
+      // {a[0]+a[1], b[0]+b[1], c[2]+c[3], d[2]+d[3]}
+      __m256d blend = _mm256_blend_pd(sumab, sumcd, 0b1100);
+
+      // {a[2]+a[3], b[2]+b[3], c[0]+c[1], d[0]+d[1]}
+      __m256d perm = _mm256_permute2f128_pd(sumab, sumcd, 0x21);
+
+      // {sum(a), sum(b), sum(c), sum(d)}
+      __m256d Ay = _mm256_add_pd(perm, blend);
+
+      // Now we want to take the dotproduct: dot(x, Ay)
+
+      __m256d e = _mm256_mul_pd(Ay, xrow);
+
+      // horizontal sum of e: tricky again.
+      // {e[0]+e[1], e[0]+e[1], e[2]+e[3], e[2]+e[3]}
+      __m256d tmp = _mm256_hadd_pd(e, e);
+
+      // {e[2]+e[3], e[2]+e[3]}
+      __m128d e23 = _mm256_extractf128_pd(tmp, 1);
+      __m128d result = _mm_add_pd(_mm256_castpd256_pd128(tmp), e23);
+
+      _mm_storel_pd(out, result);
+      asm volatile ("# avx code end");
+  }
+
+  static double run_avx(double *x, double *A, double *y, int count)
+  {
+      double result = 0.0;
+      for (int i=0; i < count; i++)
+      {
+          int j = i & the_mask;
+          vecmatvec_avx(x+j, A+j, y+j, &result);
+      }
+      return result;
   }
 
   void print_buffer(unsigned char *buf, size_t size) {
-      i256 x;
-      set_zero(x);
-      x[0] = 2;
+      double Ap[16];
+      double xp[4], yp[4];
+      randmat(Ap);
+      randvec(xp);
+      randvec(yp);
+      static const int muls_per_run = 4096;
+      run_avx(xp, Ap, yp, muls_per_run);
+      // i256 x;
+      // set_zero(x);
+      // x[0] = 2;
 
-      i256 y;
-      set_zero(y);
-      x[0] = 3;
+      // i256 y;
+      // set_zero(y);
+      // x[0] = 3;
 
       i256 r;
       set_zero(r);
 
-      mul256(&x, &y, &r);
+      // mul256(&x, &y, &r);
+
+      // u_int64_t hi;
+      // u_int64_t lo;
+      // mult64to128(2, 3, &hi, &lo);
+
+      void* p = &r;
 
       for (uint i = 0; i < 31; i++) {
-          printf("%X.", r[i]);
+          // printf("%X.", r[i]);
+          printf("%X.", *(unsigned int *)(p+i));
       }
       printf("\n");
 
