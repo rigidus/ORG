@@ -1406,34 +1406,87 @@ compile: gcc -c -Wall -Werror -mavx512f -fpic -o ${TESTLIBPATH}/test.o ${TESTLIB
   #+BEGIN_SRC sh
     .PHONY: all c go run env
 
-    TESTLIBPATH="./ctestlib"
+    LIBPATH="./ctestlib"
 
-    all: c
+    all: as c
+        gcc -shared -o ${LIBPATH}/libtest.so ${LIBPATH}/test.o ${LIBPATH}/asm.o
 
-    env:
-        docker build --tag cgo .
-        docker run --rm -ti -v $(shell pwd):/src cgo
+    as:
+        as -o ${LIBPATH}/asm.o ${LIBPATH}/test.S
 
     c:
-        gcc -mbmi2 -O3 -c -Wall -Wextra -pedantic -Werror -fpic -o ${TESTLIBPATH}/test.o ${TESTLIBPATH}/test.c
-        gcc -shared -o ${TESTLIBPATH}/libtest.so ${TESTLIBPATH}/test.o
+        gcc -mbmi2 -O3 -c -Wall -Wextra -pedantic -Werror -fpic \
+            -o ${LIBPATH}/test.o ${LIBPATH}/test.c
 
     bench:
-        go test /home/rigidus/src/1inch/pathfinder.1inch.exchange/protocols/base/unoswap/mymarket_test.go -test.v -test.bench 'BenchmarkMarket_MyGetReturn' -test.run ^$ -test.cpuprofile cpu.prof
+        go test /home/rigidus/src/1inch/pf/protocols/base/unoswap/mymarket_test.go \
+            -test.v -test.bench 'BenchmarkMarket_MyGetReturn' \
+            -test.run ^$ -test.cpuprofile cpu.prof
 
     dis:
-        objdump -d -S -l ${TESTLIBPATH}/libtest.so > ${TESTLIBPATH}/libtest.asm
+        objdump -d -S -l ${LIBPATH}/libtest.so > ${LIBPATH}/libtest.asm
 
     clean:
-        rm ${TESTLIBPATH}/libtest.so
-        rm ${TESTLIBPATH}/test.o
-        rm ${TESTLIBPATH}/libtest.asm
+        rm ${LIBPATH}/libtest.so
+        rm ${LIBPATH}/test.o
+        rm ${LIBPATH}/libtest.asm
+        rm ${LIBPATH}/asm.o
+  #+END_SRC
+- Создаю отдельный ассемблерный файл test.S
+  #+BEGIN_SRC asm
+        .globl  mul256b
+    #;;; u256b mul256c(u256b *x, u256b *y)
+    #;;; RDI, RSI, RDX, RCX, R8, R9
+    mul256b:
+        mov	(%rsi), %rax
+        mov	(%rdx), %r8
+        mov	0x8(%rdx), %r9
+        mov	%rbp, -0x8(%rsp)
+        mov	%rax, %rbp
+        mov	0x18(%rdx), %rcx
+        imul	%rbp, %rcx
+        mov	0x10(%rdx), %r10
+        mul	%r8
+        mov	%rax, (%rdi)
+        mov	%rdx, %r11
+        mov	%rbp, %rax
+        mul	%r10
+        mov	%r12, -0x10(%rsp)
+        mov	%rax, %r12
+        add	%rdx, %rcx
+        mov	%rbp, %rax
+        mul	%r9
+        add	%rax, %r11
+        mov	0x8(%rsi), %rbp
+        adc	%rdx, %r12
+        adc	$0, %rcx
+        imul	%rbp, %r10
+        mov	%rbp, %rax
+        mul	%r8
+        add	%rax, %r11
+        mov	%rbp, %rax
+        adc	%rdx, %r12
+        adc	%r10, %rcx
+        mov	0x10(%rsi), %rbp
+        mul	%r9
+        mov	%r11, 0x8(%rdi)
+        imul	%rbp, %r9
+        add	%rax, %r12
+        mov	%rbp, %rax
+        adc	%rdx, %rcx
+        mov	0x18(%rsi), %rbp
+        imul	%r8, %rbp
+        add	%rbp, %rcx
+        mov	-0x8(%rsp), %rbp
+        mul	%r8
+        add	%rax, %r12
+        mov	%r12, 0x10(%rdi)
+        mov	-0x10(%rsp), %r12
+        adc	%r9, %rcx
+        add	%rdx, %rcx
+        mov	%rcx, 0x18(%rdi)
+        retq
 
-    go:
-        go build -o app *.go
-
-    run:
-        ./app
   #+END_SRC
 - Создаю сишный код с ассемблерными вставками
   #+BEGIN_SRC c
@@ -1450,14 +1503,30 @@ compile: gcc -c -Wall -Werror -mavx512f -fpic -o ${TESTLIBPATH}/test.o ${TESTLIB
         printf("\n");
     }
 
+    typedef unsigned long long u64b;
+    typedef __uint128_t u128b;
+    typedef struct u256b u256b;
+    struct u256b
+    {
+        u64b lo;
+        u64b mid;
+        u128b hi;
+    };
+
+    extern u256b mul256b(u256b *x, u256b *y);
+
     int sum(void *par1, void *par2, void *res) {
+
+        u256b result;
+        result = mul256b((u256b *)par1, (u256b *)par2);
+        show(&result, 256);
 
         /* uint64_t msr1; */
         /* uint64_t msr2; */
 
-        /* asm volatile ( "rdtsc\n\t"              // Returns the time in EDX:EAX. */
-        /*                "shl $32, %%rdx\n\t"     // Shift the upper bits left. */
-        /*                "or %%edx, %%eax"        // 'Or' in the lower bits. */
+        /* asm volatile ( "rdtsc\n\t"           // Returns the time in EDX:EAX. */
+        /*                "shl $32, %%rdx\n\t"  // Shift the upper bits left. */
+        /*                "or %%edx, %%eax"     // 'Or' in the lower bits. */
         /*                : "=a" (msr1) */
         /*                : */
         /*                : "rdx"); */
@@ -1467,9 +1536,6 @@ compile: gcc -c -Wall -Werror -mavx512f -fpic -o ${TESTLIBPATH}/test.o ${TESTLIB
 
         /* uint128  prod; */
         uint64_t hi, lo;
-
-        /* prod = aa * bb ; */
-        /* show(&prod, 128); */
 
         __asm__ volatile ( "mov   %[aa], %%rax   \n"
                            "mov   %[bb], %%rdx   \n"
