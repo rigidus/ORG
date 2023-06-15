@@ -1,0 +1,197 @@
+:PROPERTIES:
+:ID:       48ed7fc6-8226-47c7-bc86-ebe928bb1bfa
+:END:
+#+title: hyper-key
+
+
+
+
+https://who-t.blogspot.com/2020/09/user-specific-xkb-configuration-putting.html
+
+
+https://stackoverflow.com/questions/72450298/use-hyper-key-in-gnome-shortcuts
+
+Я нашел решение своей проблемы с ключом Hyper, возможно, это решение работает и для вас (если вы используете Xorg. Думаю, решение не работает с Wayland...):
+
+Сначала я сопоставил Caps с Hyper в программе настройки
+
+Но когда я добавляю ярлык в настройки Gnome, ярлык распознается как Super вместо Hyper. Похоже, проблема в том, что Super и Hyper сопоставляются с mod4 в xmodmap:
+
+#+BEGIN_SRC sh
+$ xmodmap -pm
+xmodmap:  up to 5 keys per modifier, (keycodes in parentheses):
+
+shift       Shift_L (0x32),  Shift_R (0x3e)
+lock
+control     Control_L (0x25),  Control_R (0x69)
+mod1        Alt_L (0x40),  Meta_L (0xcd)
+mod2        Num_Lock (0x4d)
+mod3
+mod4        Hyper_L (0x42),  Super_L (0x85),  Super_R (0x86),  Super_L (0xce),  Hyper_L (0xcf)
+mod5        ISO_Level3_Shift (0x5c),  Mode_switch (0xcb)
+#+END_SRC
+
+Эта команда перемещает Hyper_L в mod3:
+
+#+BEGIN_SRC sh
+$ xmodmap -e "remove mod4 = Hyper_L" -e "add mod3 = Hyper_L"
+#+END_SRC
+
+Теперь Hyper правильно распознается в настройках сочетаний клавиш, и сочетания клавиш работают нормально.
+
+
+-------------------------------------------
+
+
+https://gist.github.com/nat-418/135a62fb9f37cc87cd70af1ab72e276a
+
+ How to enable the Hyper key on Linux
+hyper-key.desktop
+[Desktop Entry]
+Name[en_US]=hyper-key
+Comment[en_US]=Set CapsLock to Control and Escape to Hyper
+Exec=/usr/local/bin/hyper-key.sh
+Icon=application-default-icon
+X-GNOME-Autostart-enabled=true
+Type=Application
+
+hyper-key.sh
+
+#!/bin/sh
+#
+# This file contains commands designed to modify an ANSI keyboard
+# layout to be more ergonomic and allow a greater range of user-defined
+# keybindings by levraging the archaic Hyper key orginally found on
+# Symbolics "Space Cadet" keyboards and functionally vestigial in Linux.
+# The script can be run standalone to test or set to automatically on
+# user login, eg. in $HOME/.config/autostart/hyper-key.desktop
+
+# Start with a clean ANSI US QWERTY layout. This can also be used to
+# unset the rest of the configuration commands.
+pkill xcape
+setxkbmap -layout us
+
+# Abolish CapsLock and replace with Control
+setxkbmap -option ctrl:nocaps
+
+# Some Linux distributions like Ubuntu have Hyper set to the same mappings
+# as Super (Mod4), so we need to unset those
+xmodmap -e "remove Mod4 = Hyper_L"
+# Set Escape to be the left Hyper key
+xmodmap -e "keycode 9 = Hyper_L"
+# Set Hyper_L to use the normally unused Mod3
+xmodmap -e "add Mod3 = Hyper_L"
+
+# Set left Control to Escape
+xmodmap -e "keycode 37 = Escape"
+# Old Escape / new Hyper_L sends Escape when pressed alone
+xcape -e '#9=Escape'
+# Old CapsLock / new Control_L sends Escape when pressed alone
+xcape -e '#66=Escape'
+
+
+@nat-418
+Author
+nat-418 commented Mar 26, 2022 •
+
+This is an attempt at a more ergonomic programmer's keyboard layout without the need of special hardware (thumb clusters, etc.). With this setup, a user essentially has the entire home row area of the keyboard available for custom hotkeys using something like AutoKey. The default ANSI placement of the left Control key is in my opinion difficult to reach, while hitting the CapsLock or Escape key is easier. By using Hyper instead of Control or Alt for user-defined custom keybindings, there is no risk of accidentally clobbering some existing program's settings. Hyper allows an easy logical separation of concerns for modifier keys: Alt is for application shortcuts, Control is for terminal controls, and Hyper is for user customization.
+
+
+
+#+title: hyper-key
+
+
+ How to enable the Hyper key on Linux
+hyper-key.desktop
+[Desktop Entry]
+Name[en_US]=hyper-key
+Comment[en_US]=Set CapsLock to Control and Escape to Hyper
+Exec=/usr/local/bin/hyper-key.sh
+Icon=application-default-icon
+X-GNOME-Autostart-enabled=true
+Type=Application
+hyper-key.sh
+#!/bin/sh
+#
+# This file contains commands designed to modify an ANSI keyboard
+# layout to be more ergonomic and allow a greater range of user-defined
+# keybindings by levraging the archaic Hyper key orginally found on
+# Symbolics "Space Cadet" keyboards and functionally vestigial in Linux.
+# The script can be run standalone to test or set to automatically on
+# user login, eg. in $HOME/.config/autostart/hyper-key.desktop
+
+# Start with a clean ANSI US QWERTY layout. This can also be used to
+# unset the rest of the configuration commands.
+pkill xcape
+setxkbmap -layout us
+
+# Abolish CapsLock and replace with Control
+setxkbmap -option ctrl:nocaps
+
+# Some Linux distributions like Ubuntu have Hyper set to the same mappings
+# as Super (Mod4), so we need to unset those
+xmodmap -e "remove Mod4 = Hyper_L"
+# Set Escape to be the left Hyper key
+xmodmap -e "keycode 9 = Hyper_L"
+# Set Hyper_L to use the normally unused Mod3
+xmodmap -e "add Mod3 = Hyper_L"
+
+# Set left Control to Escape
+xmodmap -e "keycode 37 = Escape"
+# Old Escape / new Hyper_L sends Escape when pressed alone
+xcape -e '#9=Escape'
+# Old CapsLock / new Control_L sends Escape when pressed alone
+xcape -e '#66=Escape'
+@nat-418
+Author
+nat-418 commented Mar 26, 2022 •
+
+This is an attempt at a more ergonomic programmer's keyboard layout without the need of special hardware (thumb clusters, etc.). With this setup, a user essentially has the entire home row area of the keyboard available for custom hotkeys using something like AutoKey. The default ANSI placement of the left Control key is in my opinion difficult to reach, while hitting the CapsLock or Escape key is easier. By using Hyper instead of Control or Alt for user-defined custom keybindings, there is no risk of accidentally clobbering some existing program's settings. Hyper allows an easy logical separation of concerns for modifier keys: Alt is for application shortcuts, Control is for terminal controls, and Hyper is for user customization.
+
+
+---------------------
+
+
+
+Я нашел решение своей проблемы с ключом Hyper, возможно, это решение работает и для вас (если вы используете Xorg. Думаю, решение не работает с Wayland...):
+
+Сначала я сопоставил Caps с Hyper в программе настройки:
+
+введите здесь описание изображения
+
+Но когда я добавляю ярлык в настройки Gnome, ярлык распознается как Super вместо Hyper. Похоже, проблема в том, что Super и Hyper сопоставляются с mod4 в xmodmap:
+
+$ xmodmap -pm
+xmodmap:  up to 5 keys per modifier, (keycodes in parentheses):
+
+shift       Shift_L (0x32),  Shift_R (0x3e)
+lock
+control     Control_L (0x25),  Control_R (0x69)
+mod1        Alt_L (0x40),  Meta_L (0xcd)
+mod2        Num_Lock (0x4d)
+mod3
+mod4        Hyper_L (0x42),  Super_L (0x85),  Super_R (0x86),  Super_L (0xce),  Hyper_L (0xcf)
+mod5        ISO_Level3_Shift (0x5c),  Mode_switch (0xcb)
+
+Эта команда перемещает Hyper_L в mod3:
+
+$ xmodmap -e "remove mod4 = Hyper_L" -e "add mod3 = Hyper_L"
+
+Создавать $HOME/.config/autostart/xmodmap.desktopсо следующим содержимым для запуска этой команды xmodmap при запуске:
+
+[Desktop Entry]
+Name=Xmodmap
+Exec=xmodmap -e "remove mod4 = Hyper_L" -e "add mod3 = Hyper_L"
+Terminal=false
+Type=Application
+
+Теперь Hyper правильно распознается в настройках сочетаний клавиш, и сочетания клавиш работают нормально.
+Делиться
+Следовать
+изменено 26 июн 2022 в 10:46
+ответ дан 26 июн 2022 в 10:34
+аватар пользователя kayahr
+каяр
+20.8k 29 29 золотых знаков 99 99 серебряных знаков 147 147 бронзовых знаков
+
+    Я полагаю, что пробовал то же самое (включая конфигурацию Xmodmap), за исключением того, что я настроил поведение Caps-Lock через командную строку. setxkbmap -option "caps:hyper"который, как я думал, будет делать то же самое, что и описанный вами вариант графического интерфейса. Либо я где-то ошибся при тестировании, либо есть разница между опцией графического интерфейса и командой командной строки.
