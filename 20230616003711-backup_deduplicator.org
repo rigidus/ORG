@@ -10,70 +10,31 @@
 - опционально - сжимает эти файлы и заворачивает мелкие файлы в тарболы
 
 #+BEGIN_SRC lisp
-  (ql:quickload "split-sequence")
+  (ql:quickload "cl-fad")
+  (ql:quickload "ironclad")
 
-  (defparameter *que* nil)
-  (defparameter *hft* (make-hash-table))
-
-  (defun push-to-dir-que (list-of-dirs)
-    (loop for dir in list-of-dirs do
-      (push dir *dir-que*)))
-
-  (defun get-subdirs (dir)
-    (let* ((fnd-cmd (list "find" dir "-type" "d"))
-           (fnd-res (uiop:run-program fnd-cmd :output :string)))
-      (cdr (remove-if #'(lambda (elt) (equal elt ""))
-                      (split-sequence:split-sequence #\NewLine fnd-res)))))
-
-  ;; (get-subdirs ".")
-
-  (defun traverse-dirs (dir)
-    "side-effect: *que*"
-    (loop for dir in (get-subdirs dir) do
-      (push dir *que*)
-      (traverse-dirs dir)))
-
-  ;; (traverse-dirs "./")
-  ;; *que*
-
-  (defun get-hash-and-path-for-all-files-in-directory (dir)
-    "returns list of list like '((hash path) (hash path) ..)"
-    (let* ((fnd-cmd (list "find" dir "-type" "f" "-exec" "md5sum" "{}" "\;"))
-           (fnd-res (uiop:run-program fnd-cmd :output :string))
-           (pairs (loop for str in (split-sequence:split-sequence #\NewLine fnd-res)
-                        collect (remove-if #'(lambda (elt) (equal elt ""))
-                                           (split-sequence:split-sequence #\Space str)))))
-      (loop for (hash path) :in (remove-if #'null pairs)
-            collect (list (parse-integer hash :radix 16) path))))
-
-  ;; (get-hash-and-path-for-all-files-in-directory ".")
-
-  (defun process-que ()
-    (tagbody repeat
-       (let ((elt (pop *que*)))
-         (if (not (null elt))
-             (let ((hash-files (get-hash-and-path-for-all-files-in-directory (pop *que*))))
-               (if (not (null hash-files))
-                   (loop for (hash file) in hash-files do
-                     (multiple-value-bind (value present-p)
-                         (gethash hash *hft*)
-                       (if (null present-p)
-                           (setf (gethash hash *hft*) (list file))
-                           (setf (gethash hash *hft*) (push file value))))))
-               (go repeat))
-             ;; else - empty que
-             (print ":: -fin- ::")))))
-
-  (defun main (dir)
-    (setf *que* nil)
-    (setf *hft* (make-hash-table))
-    (traverse-dirs dir)
-    (process-que)
-    (maphash #'(lambda (k v)
-                 (if (> 1 (length v))
+  (let ((ht (make-hash-table :test #'equal)))
+    (labels ((dir-p (dir)
+               (let ((last (- (length dir) 1)))
+                 (if (< last 0)
+                     (error 'empty-dir))
+                 (char= #\/ (char dir last))))
+             (walk (name)
+               (handler-case
+                   (let ((fnamestr (namestring name)))
+                     (unless (dir-p fnamestr)
+                       (let ((hash
+                               (ironclad:byte-array-to-hex-string
+                                (ironclad:digest-file 'ironclad:md5 fnamestr))))
+                         (multiple-value-bind (value present-p)
+                             (gethash hash ht)
+                           (if (null present-p)
+                               (setf (gethash hash ht) (list fnamestr))
+                               (setf (gethash hash ht) (push fnamestr value)))))))
+                 (FILE-DOES-NOT-EXIST nil))))
+      (cl-fad:walk-directory "/home/rigidus/src/" #'walk :directories t)
+      (maphash #'(lambda (k v)
+                   (when (> (length v) 1)
                      (print (list k v))))
-             ,*hft*))
-
-  ;; (main "/home/rigidus/src/")
-  ;; (print "a")
+               ht)))
 #+END_SRC
