@@ -10,21 +10,31 @@
 - опционально - сжимает эти файлы и заворачивает мелкие файлы в тарболы
 
 #+BEGIN_SRC lisp
-
-  (defun process-files-in-directory (directory-path function)
-    "Обрабатывает все файлы в директории и ее поддиректориях с помощью указанной функции."
-    (labels ((traverse (directory)
-               (dolist (entry (directory directory))
-                 (let ((path (merge-pathnames entry directory)))
-                   (cond
-                     ((directoryp path) ; Если это поддиректория, продолжаем обход
-                      (traverse path))
-                     ((file-exists-p path) ; Если это файл, применяем функцию
-                      (funcall function path)))))))
-      (traverse (make-pathname :directory directory-path))))
-
-
   (ql:quickload "split-sequence")
+
+  (defparameter *que* nil)
+  (defparameter *hft* (make-hash-table))
+
+  (defun push-to-dir-que (list-of-dirs)
+    (loop for dir in list-of-dirs do
+      (push dir *dir-que*)))
+
+  (defun get-subdirs (dir)
+    (let* ((fnd-cmd (list "find" dir "-type" "d"))
+           (fnd-res (uiop:run-program fnd-cmd :output :string)))
+      (cdr (remove-if #'(lambda (elt) (equal elt ""))
+                      (split-sequence:split-sequence #\NewLine fnd-res)))))
+
+  ;; (get-subdirs ".")
+
+  (defun traverse-dirs (dir)
+    "side-effect: *que*"
+    (loop for dir in (get-subdirs dir) do
+      (push dir *que*)
+      (traverse-dirs dir)))
+
+  ;; (traverse-dirs "./")
+  ;; *que*
 
   (defun get-hash-and-path-for-all-files-in-directory (dir)
     "returns list of list like '((hash path) (hash path) ..)"
@@ -38,13 +48,32 @@
 
   ;; (get-hash-and-path-for-all-files-in-directory ".")
 
-  (defun get-subdirs (dir)
-    (let* ((fnd-cmd (list "find" dir "-type" "d"))
-           (fnd-res (uiop:run-program fnd-cmd :output :string)))
-      (cdr (remove-if #'(lambda (elt) (equal elt ""))
-                      (split-sequence:split-sequence #\NewLine fnd-res)))))
+  (defun process-que ()
+    (tagbody repeat
+       (let ((elt (pop *que*)))
+         (if (not (null elt))
+             (let ((hash-files (get-hash-and-path-for-all-files-in-directory (pop *que*))))
+               (if (not (null hash-files))
+                   (loop for (hash file) in hash-files do
+                     (multiple-value-bind (value present-p)
+                         (gethash hash *hft*)
+                       (if (null present-p)
+                           (setf (gethash hash *hft*) (list file))
+                           (setf (gethash hash *hft*) (push file value))))))
+               (go repeat))
+             ;; else - empty que
+             (print ":: -fin- ::")))))
 
-  ;; (get-subdirs ".")
+  (defun main (dir)
+    (setf *que* nil)
+    (setf *hft* (make-hash-table))
+    (traverse-dirs dir)
+    (process-que)
+    (maphash #'(lambda (k v)
+                 (if (> 1 (length v))
+                     (print (list k v))))
+             ,*hft*))
 
-
+  ;; (main "/home/rigidus/src/")
+  ;; (print "a")
 #+END_SRC
